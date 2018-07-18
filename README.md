@@ -1,4 +1,4 @@
-# Download and extract the contents of URLs in parallel
+# Download and extract the contents of multiple URLs in parallel
 This is a utility for downloading the contents of a set of given URLs
 in parallel and extracting their contents using [Diffbot](https://www.diffbot.com/). The input
 to the program is a CSV file in which one of the columns holds the URLs to be downloaded. The
