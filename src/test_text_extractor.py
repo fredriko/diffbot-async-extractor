@@ -2,12 +2,13 @@ from unittest import TestCase
 from bs4 import BeautifulSoup
 from src.text_extractor import TextExtractor
 import requests
+from pprint import pprint
 
 
 class TestExtractText(TestCase):
 
     def test_extract_text(self):
-        url = "https://medium.com/suspended"
+        url = "https://www.kaggle.com/jhoward/nb-svm-strong-linear-baseline/"
         response = requests.get(url, allow_redirects=True, headers=TextExtractor.USER_AGENT)
         title, text = TextExtractor.extract_text(response.text, url)
         print(f"title: {title}")
@@ -33,5 +34,4 @@ class TestExtractText(TestCase):
         response = requests.get(url, allow_redirects=True, headers=TextExtractor.USER_AGENT)
         title, text = TextExtractor.extract_text(response.text, url)
         print(f"title: {title}")
-        print(f"text:  {text}")
-
+        print(f"text: {text}")

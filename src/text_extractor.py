@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup
 from typing import Tuple
 import newspaper
 import requests
+import json
 
 
 class TextExtractor(object):
@@ -69,16 +70,29 @@ class TextExtractor(object):
         return "", ""
 
     @staticmethod
+    def _extract_text_instagram(content: BeautifulSoup) -> Tuple[str, str]:
+        title = text = ""
+        if content.find("script") is not None:
+            data = json.loads(content.find('script', type='application/ld+json').text)
+            text = data.get("caption", "")
+            title = data.get("name")
+            if title is not None:
+                title = title.split(":")[0]
+        return title, text
+
+    @staticmethod
     def extract_text(html, url) -> Tuple[str, str]:
         try:
             title = text = ""
             content = BeautifulSoup(html, "lxml")
-            if "https://twitter.com" in url:
+            if "twitter.com" in url:
                 title, text = TextExtractor._extract_text_twitter(content)
-            elif "https://arxiv.org" in url:
+            elif "arxiv.org" in url:
                 title, text = TextExtractor._extract_text_arxiv(content)
             elif "bloomberg.com" in url:
                 title, text = TextExtractor._extract_text_bloomberg(content)
+            elif "instagram.com" in url:
+                title, text = TextExtractor._extract_text_instagram(content)
             else:
                 try:
                     title, text = TextExtractor._extract_text_fancy(html, content)
