@@ -11,9 +11,10 @@ import random
 import requests
 from w3lib.url import canonicalize_url, url_query_cleaner
 from pymongo.collection import Collection
+
+from src.text_extractor import TextExtractor
 from src.third_party.diffbot import DiffbotClient
 from src.third_party import asyncioplus
-from bs4 import BeautifulSoup
 
 
 def set_up_db(db: str, collection: str) -> Collection:
@@ -35,33 +36,6 @@ def diffbot_extract(url: str, access_token: str) -> Dict[str, object]:
         print("Got error when calling Diffbot for url: {} - {}".format(error, url))
         response = None
     return response
-
-
-def extract_text(html, url=None) -> str:
-    """ Method for extracting the (relevant) plain text content from a HTML document. """
-    try:
-        text = ""
-        content = BeautifulSoup(html, "lxml")
-        if url is not None and "https://twitter.com" in url:
-            if content.find("title") is not None:
-                text = content.find("title").text.strip()
-        else:
-            for script in content(["script", "style", "pre", "code", "aside"]):
-                script.extract()
-            select = [e.text.strip() for e in content.select("p")]
-            if content.find("title") is not None:
-                title = content.find("title").text.strip()
-                select.insert(0, title)
-            text = "\n".join(select)
-        # Heuristics adopted from elsewhere: when the "raw" text of the HTML document
-        # is much larger than that of the text extracted from paragraphs, use the raw
-        # text. Useful if, e.g., the HTML does not contain paragraph mark-up
-        # if 0.1 * len(str(content.get_text())) >= len(text):
-        #    text = str(content.get_text)
-    except TypeError:
-        print("Could not parse payload: {}".format(html))
-        text = ""
-    return text
 
 
 def read_urls_from_csv(csv_file: str, url_field: str, collection: Collection) -> List[str]:
@@ -103,8 +77,8 @@ async def extract_async_text(url: str, collection: Collection) -> str:
             result = f"Could not retrieve url {url} - got error: {connection_error}"
             return result
         if response.ok:
-            text = extract_text(response.text, url=url)
-            collection.insert_one({"_id": id, "url": url, "text": text})
+            title, text = TextExtractor.extract_text(response.text, url=url)
+            collection.insert_one({"_id": id, "url": url, "title": title, "text": text})
             result = f"Extracted text from url {url} in {(time.time() - start_time)} seconds"
         else:
             result = f"Response status: {response.status_code} - Could not extract data from url {url}"
@@ -146,10 +120,10 @@ async def execute_tasks(tasks, num_tasks: int):
 if __name__ == "__main__":
     ### CONFIGURE
     diffbot_api_token = None
-    input_file = "/path/to/urls.csv"
+    input_file = "/Users/fredriko/data/metacurate/urls/urls-1812.csv"
     name_of_url_field = "url"
     db_name = "texts"
-    db_collection_name = "plain_text"
+    db_collection_name = "plain_text_w_title"
     ### END CONFIGURE
 
     collection = set_up_db(db_name, db_collection_name)
