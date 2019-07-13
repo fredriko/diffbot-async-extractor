@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import datetime
 
 import pymongo
 import csv
@@ -17,6 +18,7 @@ from src.third_party.diffbot import DiffbotClient
 from src.third_party import asyncioplus
 
 
+# TODO re-write to make sure tasks do not die. See rise-edu.
 def set_up_db(db: str, collection: str) -> Collection:
     client = pymongo.MongoClient("mongodb://localhost:27017/")
     return client[db][collection]
@@ -24,8 +26,9 @@ def set_up_db(db: str, collection: str) -> Collection:
 
 logging.basicConfig(level=logging.DEBUG)
 
-USER_AGENT_HEADER = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36"}
+HTTP_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36",
+    "Accept-Language": "en-US;q=0.8,en;q=0.7"}
 
 
 def diffbot_extract(url: str, access_token: str) -> Dict[str, object]:
@@ -69,16 +72,20 @@ async def extract_async_text(url: str, collection: Collection) -> str:
     if document is None:
         start_time = time.time()
         try:
-            response = requests.get(url, allow_redirects=True, headers=USER_AGENT_HEADER)
+            response = requests.get(url, allow_redirects=True, headers=HTTP_HEADERS)
         except requests.exceptions.SSLError as ssl_error:
             result = f"Could not retrieve url {url} - got error: {ssl_error}"
             return result
         except requests.exceptions.ConnectionError as connection_error:
             result = f"Could not retrieve url {url} - got error: {connection_error}"
             return result
+        except requests.exceptions.ContentDecodingError as decoding_error:
+            result = f"Could not retrieve url {url} - gor error: {decoding_error}"
+            return result
         if response.ok:
             title, text = TextExtractor.extract_text(response.text, url=url)
-            collection.insert_one({"_id": id, "url": url, "title": title, "text": text})
+            collection.insert_one(
+                {"_id": id, "url": url, "title": title, "text": text, "text_extracted_at": datetime.utcnow()})
             result = f"Extracted text from url {url} in {(time.time() - start_time)} seconds"
         else:
             result = f"Response status: {response.status_code} - Could not extract data from url {url}"
@@ -101,6 +108,7 @@ async def extract_async_diffbot(diffbot_api_token: str, url: str, collection: Co
                 result = "Could not extract data: {}".format(response["error"])
             else:
                 response["_id"] = id
+                response["text_extracted_at"] = datetime.utcnow()
                 collection.insert_one(response)
                 result = "Extracted text from url {} in {} seconds.".format(url, (time.time() - start_time))
         else:
@@ -112,15 +120,17 @@ async def extract_async_diffbot(diffbot_api_token: str, url: str, collection: Co
 
 async def execute_tasks(tasks, num_tasks: int):
     num_tasks_completed = 0
-    for result in asyncioplus.limited_as_completed(tasks, 150):
+    for result in asyncioplus.limited_as_completed(tasks, 300):
         num_tasks_completed += 1
         print("{}/{} Done: {}".format(num_tasks_completed, num_tasks, await result), flush=True)
 
 
 if __name__ == "__main__":
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+
     ### CONFIGURE
     diffbot_api_token = None
-    input_file = "/Users/fredriko/data/metacurate/urls/urls-1812.csv"
+    input_file = "/Users/fredriko/Dropbox/data/metacurate-urls/urls-1907.csv"
     name_of_url_field = "url"
     db_name = "texts"
     db_collection_name = "plain_text_w_title"

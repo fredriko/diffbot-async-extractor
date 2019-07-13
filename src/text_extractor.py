@@ -6,15 +6,16 @@ import json
 
 
 class TextExtractor(object):
-    USER_AGENT = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36"}
+    HTTP_HEADERS = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36",
+        "Accept-Language": "en-US;q=0.8,en;q=0.7"}
 
     def __init__(self):
         pass
 
     @staticmethod
     def get_content(url: str) -> BeautifulSoup:
-        response = requests.get(url, allow_redirects=True, headers=TextExtractor.USER_AGENT)
+        response = requests.get(url, allow_redirects=True, headers=TextExtractor.HTTP_HEADERS)
         response.raise_for_status()
         content = BeautifulSoup(response.text, "lxml")
         return content
@@ -73,11 +74,14 @@ class TextExtractor(object):
     def _extract_text_instagram(content: BeautifulSoup) -> Tuple[str, str]:
         title = text = ""
         if content.find("script") is not None:
-            data = json.loads(content.find('script', type='application/ld+json').text)
-            text = data.get("caption", "")
-            title = data.get("name")
-            if title is not None:
-                title = title.split(":")[0]
+            try:
+                data = json.loads(content.find('script', type='application/ld+json').text)
+                text = data.get("caption", "")
+                title = data.get("name")
+                if title is not None:
+                    title = title.split(":")[0]
+            except Exception as err:
+                print(f"Gott error: {err}")
         return title, text
 
     @staticmethod
