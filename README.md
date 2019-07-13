@@ -47,7 +47,7 @@ the URLs to download, and the MongoDb database/collection in which to store the 
 Then type:
 
 ```
-$ python diffbot_async_extractor.py
+$ python main.py
 ``` 
 
 to start the program and initialize the extraction.
