@@ -74,21 +74,60 @@ async def extract_async_text(url: str, collection: Collection) -> str:
         try:
             response = requests.get(url, allow_redirects=True, headers=HTTP_HEADERS)
         except requests.exceptions.SSLError as ssl_error:
-            result = f"Could not retrieve url {url} - got error: {ssl_error}"
+            result = f"Could not retrieve url {url}. Failed after {(time.time()) - start_time} seconds - got error: {ssl_error}"
+            collection.insert_one(
+                {"_id": id,
+                 "url": url,
+                 "text_extracted_at": datetime.utcnow(),
+                 "extraction_status_ok": False,
+                 "extraction_fail_reason": "SSL error"
+                 }
+            )
             return result
         except requests.exceptions.ConnectionError as connection_error:
-            result = f"Could not retrieve url {url} - got error: {connection_error}"
+            result = f"Could not retrieve url {url}. Failed after {(time.time()) - start_time} seconds - got error: {connection_error}"
+            collection.insert_one(
+                {"_id": id,
+                 "url": url,
+                 "text_extracted_at": datetime.utcnow(),
+                 "extraction_status_ok": False,
+                 "extraction_fail_reason": "Connection error"
+                 }
+            )
             return result
         except requests.exceptions.ContentDecodingError as decoding_error:
-            result = f"Could not retrieve url {url} - gor error: {decoding_error}"
+            result = f"Could not retrieve url {url}. Failed after {(time.time()) - start_time} seconds - gor error: {decoding_error}"
+            collection.insert_one(
+                {"_id": id,
+                 "url": url,
+                 "text_extracted_at": datetime.utcnow(),
+                 "extraction_status_ok": False,
+                 "extraction_fail_reason": "Decoding error"
+                 }
+            )
             return result
         if response.ok:
             title, text = TextExtractor.extract_text(response.text, url=url)
             collection.insert_one(
-                {"_id": id, "url": url, "title": title, "text": text, "text_extracted_at": datetime.utcnow()})
+                {"_id": id,
+                 "url": url,
+                 "title": title,
+                 "text": text,
+                 "text_extracted_at": datetime.utcnow(),
+                 "extraction_status_ok": True
+                 }
+            )
             result = f"Extracted text from url {url} in {(time.time() - start_time)} seconds"
         else:
-            result = f"Response status: {response.status_code} - Could not extract data from url {url}"
+            result = f"Response status: {response.status_code} - Could not extract data from url {url}. Failed after {(time.time()) - start_time}"
+            collection.insert_one(
+                {"_id": id,
+                 "url": url,
+                 "text_extracted_at": datetime.utcnow(),
+                 "extraction_status_ok": False,
+                 "extraction_fail_reason": f"Extraction error - HTTP status: {response.status_code}"
+                 }
+            )
     else:
         result = f"Document already in database: {url}"
     return result
@@ -130,7 +169,7 @@ if __name__ == "__main__":
 
     ### CONFIGURE
     diffbot_api_token = None
-    input_file = "/Users/fredriko/Dropbox/data/metacurate-urls/urls-1907.csv"
+    input_file = "/Users/fredriko/Dropbox/data/metacurate-urls/urls.csv"
     name_of_url_field = "url"
     db_name = "texts"
     db_collection_name = "plain_text_w_title"
