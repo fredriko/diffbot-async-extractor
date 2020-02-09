@@ -12,6 +12,7 @@ import random
 import requests
 from w3lib.url import canonicalize_url, url_query_cleaner
 from pymongo.collection import Collection
+from pymongo.errors import DocumentTooLarge
 
 from src.text_extractor import TextExtractor
 from src.third_party.diffbot import DiffbotClient
@@ -108,16 +109,19 @@ async def extract_async_text(url: str, collection: Collection) -> str:
             return result
         if response.ok:
             title, text = TextExtractor.extract_text(response.text, url=url)
-            collection.insert_one(
-                {"_id": id,
-                 "url": url,
-                 "title": title,
-                 "text": text,
-                 "text_extracted_at": datetime.utcnow(),
-                 "extraction_status_ok": True
-                 }
-            )
-            result = f"Extracted text from url {url} in {(time.time() - start_time)} seconds"
+            try:
+                collection.insert_one(
+                    {"_id": id,
+                     "url": url,
+                     "title": title,
+                     "text": text,
+                     "text_extracted_at": datetime.utcnow(),
+                     "extraction_status_ok": True
+                     })
+                result = f"Extracted text from url {url} in {(time.time() - start_time)} seconds"
+            except DocumentTooLarge as error:
+                print(f"Got error: {error} for document with title: '{title}' and url: {url}")
+                result = f"Could not extract document from {url} - too large document. Time {time.time() - start_time} seconds."
         else:
             result = f"Response status: {response.status_code} - Could not extract data from url {url}. Failed after {(time.time()) - start_time}"
             collection.insert_one(

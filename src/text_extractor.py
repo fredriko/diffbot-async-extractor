@@ -85,6 +85,25 @@ class TextExtractor(object):
         return title, text
 
     @staticmethod
+    def _extract_text_quanta_magazine(content: BeautifulSoup) -> Tuple[str, str]:
+        # Example url with single content div:
+        # https://www.quantamagazine.org/puzzle-with-infinite-regress-is-it-turtles-all-the-way-down-20200206/
+
+        # Example url with multiple content divs:
+        # https://www.quantamagazine.org/artificial-intelligence-will-do-what-we-ask-thats-a-problem-20200130/
+
+        # The Quantamagazine site is littered with <script ...> tags. Remove them to make it easier to extract
+        # the textual contents.
+        script_tags = content.find_all("script")
+        _ = [s.extract() for s in script_tags]
+        title = content.select("#postBody > div:nth-of-type(1) > section > section > div > "
+                               "div.post__title.pv1.scale1.mha > div > h1")[0].get_text().strip()
+
+        text_containers = content.find_all("div", {"class": "post__content__section"})
+        text = "\n".join([t.get_text().strip() for t in text_containers])
+        return title, text
+
+    @staticmethod
     def extract_text(html, url) -> Tuple[str, str]:
         try:
             title = text = ""
@@ -97,6 +116,8 @@ class TextExtractor(object):
                 title, text = TextExtractor._extract_text_bloomberg(content)
             elif "instagram.com" in url:
                 title, text = TextExtractor._extract_text_instagram(content)
+            elif "quantamagazine.org" in url:
+                title, text = TextExtractor._extract_text_quanta_magazine(content)
             else:
                 try:
                     title, text = TextExtractor._extract_text_fancy(html, content)
@@ -108,3 +129,15 @@ class TextExtractor(object):
             title = ""
             text = ""
         return title, text
+
+
+if __name__ == "__main__":
+    from src.main import HTTP_HEADERS
+
+    url = "https://www.quantamagazine.org/puzzle-with-infinite-regress-is-it-turtles-all-the-way-down-20200206/"
+    #url = "https://www.quantamagazine.org/artificial-intelligence-will-do-what-we-ask-thats-a-problem-20200130/"
+    response = requests.get(url, allow_redirects=True, headers=HTTP_HEADERS)
+    if response.ok:
+        title, text = TextExtractor.extract_text(response.text, url=url)
+        print(f"title='{title}'")
+        print(f"text={text}")
