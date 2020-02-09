@@ -104,6 +104,20 @@ class TextExtractor(object):
         return title, text
 
     @staticmethod
+    def _extract_text_medium(content: BeautifulSoup) -> Tuple[str, str]:
+        # https://towardsdatascience.com/rl-train-the-robotic-arm-to-reach-a-ball-part-01-1cecd2e1cfb8?source=rss----7f60cf5620c9---4&gi=f8c99beafd9e
+
+        title = content.find("title").get_text().strip()
+        text_containers = content.select("#root > div > article > div > section > div > div")
+        tag_texts = []
+        for container in text_containers:
+            tags = container.find_all(["p", "h1", "h2", "h3", "h4", "h5", "h6"])
+            for tag in tags:
+                tag_texts.append(tag.get_text().strip())
+        text = "\n".join(tag_texts)
+        return title, text
+
+    @staticmethod
     def extract_text(html, url) -> Tuple[str, str]:
         try:
             title = text = ""
@@ -118,6 +132,8 @@ class TextExtractor(object):
                 title, text = TextExtractor._extract_text_instagram(content)
             elif "quantamagazine.org" in url:
                 title, text = TextExtractor._extract_text_quanta_magazine(content)
+            elif "towardsdatascience.com" in url or "medium.com" in url:
+                title, text = TextExtractor._extract_text_medium(content)
             else:
                 try:
                     title, text = TextExtractor._extract_text_fancy(html, content)
@@ -134,8 +150,7 @@ class TextExtractor(object):
 if __name__ == "__main__":
     from src.main import HTTP_HEADERS
 
-    url = "https://www.quantamagazine.org/puzzle-with-infinite-regress-is-it-turtles-all-the-way-down-20200206/"
-    #url = "https://www.quantamagazine.org/artificial-intelligence-will-do-what-we-ask-thats-a-problem-20200130/"
+    url = "https://www.dataversity.net/top-three-business-continuity-and-disaster-recovery-predictions-for-2020/"
     response = requests.get(url, allow_redirects=True, headers=HTTP_HEADERS)
     if response.ok:
         title, text = TextExtractor.extract_text(response.text, url=url)
