@@ -19,7 +19,6 @@ from src.third_party.diffbot import DiffbotClient
 from src.third_party import asyncioplus
 
 
-# TODO re-write to make sure tasks do not die. See rise-edu.
 def set_up_db(db: str, collection: str) -> Collection:
     client = pymongo.MongoClient("mongodb://localhost:27017/")
     return client[db][collection]
@@ -104,6 +103,17 @@ async def extract_async_text(url: str, collection: Collection) -> str:
                  "text_extracted_at": datetime.utcnow(),
                  "extraction_status_ok": False,
                  "extraction_fail_reason": "Decoding error"
+                 }
+            )
+            return result
+        except requests.exceptions.ChunkedEncodingError as chunked_error:
+            result = f"Could not retrieve url {url}. Failed after {time.time() - start_time} seconds - got error: {chunked_error}"
+            collection.insert_one(
+                {"_id": id,
+                 "url": url,
+                 "text_extracted_at": datetime.utcnow(),
+                 "extraction_status_ok": False,
+                 "extractoin_fail_reason": "Chunked encoding error"
                  }
             )
             return result
